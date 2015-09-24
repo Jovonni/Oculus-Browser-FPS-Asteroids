@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Nuracode World</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link href='http://fonts.googleapis.com/css?family=Strait' rel='stylesheet' type='text/css'>
+    <link href='css/style.css' rel='stylesheet' type='text/css'>
+    <style>
+      
+      #info{
+        padding:10px;
+        color:#fff;
+        position:absolute;
+        background-color:rgba(0,0,0,0.4);
+      }
+
+      #help-text H1 {
+        font-size:18px;
+        margin-top:15px;
+
+      }
+      
+      #help-text DIV{
+        margin-bottom:5px;
+      }
+
+      #help-text DIV LABEL{
+        display:inline-block;
+        width:160px;
+      }
+
+      #help-text SECTION {
+        margin-top:20px;
+      }
+
+      #generic_error,
+      #security_error{
+        padding-top:200px;
+        width:500px;
+        margin-left:auto;
+        margin-right:auto;
+        display:none;
+      }
+	  
+	  #hud{	
+		  position: fixed;
+		  index: 1000;
+		  bottom:120px;
+		  left:180px;
+		  width:200px;
+		  height: 50px;
+		  background:green;
+		  margin: 0 auto 0 auto;
+		  display: none;
+	  }
+
+    </style>
+
+  </head>
+
+  <body>
+	  
+	<script id="vertexShader" type="x-shader/x-vertex">
+	uniform sampler2D noiseTexture;
+	uniform float noiseScale;
+
+	uniform sampler2D bumpTexture;
+	uniform float bumpSpeed;
+	uniform float bumpScale;
+
+	uniform float time;
+
+	varying vec2 vUv;
+
+	void main() 
+	{ 
+	    vUv = uv;
+	
+		vec2 uvTimeShift = vUv + vec2( 1.1, 1.9 ) * time * bumpSpeed;
+		vec4 noiseGeneratorTimeShift = texture2D( noiseTexture, uvTimeShift );
+		vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, noiseGeneratorTimeShift.g );
+		// below, using uvTimeShift seems to result in more of a "rippling" effect
+		//   while uvNoiseTimeShift seems to result in more of a "shivering" effect
+		vec4 bumpData = texture2D( bumpTexture, uvTimeShift );
+
+		// move the position along the normal
+		//  but displace the vertices at the poles by the same amount
+		float displacement = ( vUv.y > 0.999 || vUv.y < 0.001 ) ? 
+			bumpScale * (0.3 + 0.02 * sin(time)) :  
+			bumpScale * bumpData.r;
+	    vec3 newPosition = position + normal * displacement;
+	
+		gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
+	}
+	</script>
+
+	<!-- fragment shader a.k.a. pixel shader -->
+	<script id="fragmentShader" type="x-shader/x-vertex"> 
+	uniform sampler2D baseTexture;
+	uniform float baseSpeed;
+	uniform float repeatS;
+	uniform float repeatT;
+
+	uniform sampler2D noiseTexture;
+	uniform float noiseScale;
+
+	uniform sampler2D blendTexture;
+	uniform float blendSpeed;
+	uniform float blendOffset;
+
+	uniform float time;
+	uniform float alpha;
+
+	varying vec2 vUv;
+
+	void main() 
+	{
+		vec2 uvTimeShift = vUv + vec2( -0.7, 1.5 ) * time * baseSpeed;	
+		vec4 noiseGeneratorTimeShift = texture2D( noiseTexture, uvTimeShift );
+		vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, noiseGeneratorTimeShift.b );
+		vec4 baseColor = texture2D( baseTexture, uvNoiseTimeShift * vec2(repeatS, repeatT) );
+
+		vec2 uvTimeShift2 = vUv + vec2( 1.3, -1.7 ) * time * blendSpeed;	
+		vec4 noiseGeneratorTimeShift2 = texture2D( noiseTexture, uvTimeShift2 );
+		vec2 uvNoiseTimeShift2 = vUv + noiseScale * vec2( noiseGeneratorTimeShift2.g, noiseGeneratorTimeShift2.b );
+		vec4 blendColor = texture2D( blendTexture, uvNoiseTimeShift2 * vec2(repeatS, repeatT) ) - blendOffset * vec4(1.0, 1.0, 1.0, 1.0);
+
+		vec4 theColor = baseColor + blendColor;
+		theColor.a = alpha;
+		gl_FragColor = theColor;
+	}  
+	</script>
+	<!-- ----------------------------------------------------------- -->  
+	  
+    <a id="logo" class="offline"></a>
+    <div id="info">
+      <div class="button" id="toggle-render">toggle render mode</div> <div class="button" id="help">help</div>
+      <div id="help-text" style="display:none;">
+        <h1>Controls - stereo mode:</h1>
+        <section>
+          <div><label>forward:</label>W or UP</div>
+          <div><label>backward:</label>S or DOWN</div>
+        </section>
+
+        <section>
+          <div><label>straif left:</label>A or LEFT</div>
+          <div><label>straif right:</label>D or RIGHT</div>
+        </section>
+
+        <section>
+          <div><label>turn left:</label>Q</div>
+          <div><label>turn right:</label>E</div>
+        </section>
+
+        <section>
+          <div><label>jump:</label>SPACE</div>
+        </section>
+
+        <h1>Controls - perspective mode:</h1>
+        <section>
+          <div><label>orbit:</label>left-click + drag</div>
+          <div><label>pan:</label>right-click + drag</div>
+          <div><label>zoom:</label>mouse wheel</div>
+        </section>
+      </div>
+    </div>
+	
+	
+
+
+	<div id="hud">Something</div>
+    <div id="viewport"></div>
+    <div id="security_error">
+      <p>This file must be served via HTTP to support the use of textures.</p>
+      <p>Please host this content via a web server of some kind and try again.</p>
+    </div>
+    <div id="generic_error">
+      <p>Oh dang, something went wrong while trying to render the scene.</p>
+      <p>Exception: <span id="exception_message"></span></p>
+    </div>
+    
+    <script src="../web/build/OculusBridge.min.js"></script>
+    
+    <script src="lib/three.min.js"></script>
+    <script src="lib/OrbitControls.js"></script>
+    <script src="lib/RiftCamera.js"></script>
+	
+	
+
+    <script src="js/first_person.js"></script>
+	<script src="js/asteroid.js"></script>
+	<script src="js/projectile.js"></script>
+  </body>
+</html>
